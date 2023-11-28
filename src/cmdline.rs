@@ -119,6 +119,9 @@ fn get_clap_command() -> clap::Command {
             "\n",
             "    Azure:     ",
             cfg!(feature = "azure"),
+            "\n",
+            "    Buildless: ",
+            cfg!(feature = "buildless"),
             "\n"
         ))
         .args(&[

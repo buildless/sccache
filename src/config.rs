@@ -251,9 +251,32 @@ pub struct S3CacheConfig {
     pub server_side_encryption: Option<bool>,
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BuildlessTransport {
+    HTTPS,
+    RESP,
+    GHA,
+
+    #[default]
+    AUTO,
+}
+
+pub const DEFAULT_BUILDLESS_TRANSPORT: BuildlessTransport = BuildlessTransport::AUTO;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BuildlessConfig {
+    pub enabled: bool,
+    pub use_agent: Option<bool>,
+    pub transport: Option<BuildlessTransport>,
+    pub apikey: Option<String>,
+    pub endpoint: Option<String>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum CacheType {
     Azure(AzureCacheConfig),
+    Buildless(BuildlessConfig),
     GCS(GCSCacheConfig),
     GHA(GHACacheConfig),
     Memcached(MemcachedCacheConfig),
@@ -266,6 +289,7 @@ pub enum CacheType {
 #[serde(deny_unknown_fields)]
 pub struct CacheConfigs {
     pub azure: Option<AzureCacheConfig>,
+    pub buildless: Option<BuildlessConfig>,
     pub disk: Option<DiskCacheConfig>,
     pub gcs: Option<GCSCacheConfig>,
     pub gha: Option<GHACacheConfig>,
@@ -281,6 +305,7 @@ impl CacheConfigs {
     fn into_fallback(self) -> (Option<CacheType>, DiskCacheConfig) {
         let CacheConfigs {
             azure,
+            buildless,
             disk,
             gcs,
             gha,
@@ -292,6 +317,7 @@ impl CacheConfigs {
 
         let cache_type = s3
             .map(CacheType::S3)
+            .or_else(|| buildless.map(CacheType::Buildless))
             .or_else(|| redis.map(CacheType::Redis))
             .or_else(|| memcached.map(CacheType::Memcached))
             .or_else(|| gcs.map(CacheType::GCS))
@@ -308,6 +334,7 @@ impl CacheConfigs {
     fn merge(&mut self, other: Self) {
         let CacheConfigs {
             azure,
+            buildless,
             disk,
             gcs,
             gha,
@@ -319,6 +346,9 @@ impl CacheConfigs {
 
         if azure.is_some() {
             self.azure = azure
+        }
+        if buildless.is_some() {
+            self.buildless = buildless
         }
         if disk.is_some() {
             self.disk = disk
@@ -704,6 +734,39 @@ fn config_from_env() -> Result<EnvConfig> {
         None
     };
 
+    // ======= Buildless =======
+    let buildless = if env::var("SCCACHE_BUILDLESS").is_ok() || env::var("BUILDLESS_APIKEY").is_ok()
+    {
+        // read kill switch
+        let enable_var = env::var("SCCACHE_BUILDLESS").ok().unwrap_or_default();
+        let enabled = enable_var != "FALSE"
+            && enable_var != "0"
+            && enable_var != "false"
+            && enable_var != "no";
+
+        // read custom endpoint, api key, etc
+        let endpoint = env::var("BUILDLESS_ENDPOINT").ok();
+        let apikey = env::var("BUILDLESS_APIKEY").ok();
+        let no_agent_var = env::var("BUILDLESS_NO_AGENT").is_ok();
+        let use_agent_file = false;
+        let use_agent = !no_agent_var &&  // the agent is not disabled...
+            use_agent_file; // and the agent rendezvous file exists
+
+        if !enabled {
+            None
+        } else {
+            Some(BuildlessConfig {
+                enabled: true,
+                endpoint,
+                apikey,
+                transport: Some(DEFAULT_BUILDLESS_TRANSPORT),
+                use_agent: Some(use_agent),
+            })
+        }
+    } else {
+        None
+    };
+
     // ======= Local =======
     let disk_dir = env::var_os("SCCACHE_DIR").map(PathBuf::from);
     let disk_sz = env::var("SCCACHE_CACHE_SIZE")
@@ -736,6 +799,7 @@ fn config_from_env() -> Result<EnvConfig> {
 
     let cache = CacheConfigs {
         azure,
+        buildless,
         disk,
         gcs,
         gha,
@@ -1247,6 +1311,10 @@ token = "secrettoken"
 #[cache.azure]
 # does not work as it appears
 
+[cache.buildless]
+enabled = false
+use_agent = true
+
 [cache.disk]
 dir = "/tmp/.cache/sccache"
 size = 7516192768 # 7 GiBytes
@@ -1293,6 +1361,13 @@ token = "webdavtoken"
         FileConfig {
             cache: CacheConfigs {
                 azure: None, // TODO not sure how to represent a unit struct in TOML Some(AzureCacheConfig),
+                buildless: Some(BuildlessConfig {
+                    enabled: false,
+                    use_agent: Some(true),
+                    transport: None,
+                    apikey: None,
+                    endpoint: None,
+                }),
                 disk: Some(DiskCacheConfig {
                     dir: PathBuf::from("/tmp/.cache/sccache"),
                     size: 7 * 1024 * 1024 * 1024,
