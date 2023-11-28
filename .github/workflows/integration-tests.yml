@@ -347,6 +347,108 @@ jobs:
 
           ${SCCACHE_PATH} --show-stats | grep -e "Cache hits\s*[1-9]"
 
+  buildless-cloud:
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      BUILDLESS_APIKEY: ${{ secrets.BUILDLESS_APIKEY }}
+      RUSTC_WRAPPER: /home/runner/.cargo/bin/sccache
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Buildless CLI
+        shell: bash
+        run: |
+          echo "Coming soon."
+
+      - name: Install rust
+        uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: "stable"
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: integration-tests
+          path: /home/runner/.cargo/bin/
+      - name: Chmod for binary
+        run: chmod +x ${SCCACHE_PATH}
+
+      - name: Test
+        run: cargo clean && cargo build
+
+      - name: Output
+        run: |
+          ${SCCACHE_PATH} --show-stats
+
+          ${SCCACHE_PATH} --show-stats | grep buildless
+
+      - name: Test Twice for Cache Read
+        run: cargo clean && cargo build
+
+      - name: Output
+        run: |
+          ${SCCACHE_PATH} --show-stats
+
+          ${SCCACHE_PATH} --show-stats | grep -e "Cache hits\s*[1-9]"
+
+  buildless-agent:
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      BUILDLESS_APIKEY: ${{ secrets.BUILDLESS_APIKEY }}
+      RUSTC_WRAPPER: /home/runner/.cargo/bin/sccache
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Buildless
+        shell: bash
+        run: |
+          echo "Coming soon."
+
+      - name: Start Buildless Agent
+        shell: bash
+        run: |
+          echo "Coming soon."
+
+      - name: Install rust
+        uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: "stable"
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: integration-tests
+          path: /home/runner/.cargo/bin/
+      - name: Chmod for binary
+        run: chmod +x ${SCCACHE_PATH}
+
+      - name: Test
+        run: cargo clean && cargo build
+
+      - name: Output
+        run: |
+          ${SCCACHE_PATH} --show-stats
+
+          ${SCCACHE_PATH} --show-stats | grep buildless
+
+      - name: Test Twice for Cache Read
+        run: cargo clean && cargo build
+
+      - name: Output
+        run: |
+          ${SCCACHE_PATH} --show-stats
+
+          ${SCCACHE_PATH} --show-stats | grep -e "Cache hits\s*[1-9]"
+
+      - name: Stop Buildless Agent
+        shell: bash
+        run: |
+          echo "Coming soon."
+
   test-mock-msvc:
     runs-on: windows-2019
     env:
