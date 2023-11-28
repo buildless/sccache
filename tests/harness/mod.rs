@@ -148,6 +148,7 @@ pub fn sccache_client_cfg(
     sccache::config::FileConfig {
         cache: sccache::config::CacheConfigs {
             azure: None,
+            buildless: None,
             disk: Some(disk_cache),
             gcs: None,
             gha: None,

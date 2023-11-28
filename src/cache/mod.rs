@@ -14,6 +14,8 @@
 
 #[cfg(feature = "azure")]
 pub mod azure;
+#[cfg(feature = "buildless")]
+pub mod buildless;
 #[allow(clippy::module_inception)]
 pub mod cache;
 pub mod disk;

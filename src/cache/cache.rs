@@ -14,6 +14,8 @@
 
 #[cfg(feature = "azure")]
 use crate::cache::azure::AzureBlobCache;
+#[cfg(feature = "buildless")]
+use crate::cache::buildless::BuildlessCache;
 use crate::cache::disk::DiskCache;
 #[cfg(feature = "gcs")]
 use crate::cache::gcs::{GCSCache, RWMode};
@@ -31,6 +33,7 @@ use crate::compiler::PreprocessorCacheEntry;
 use crate::config::Config;
 #[cfg(any(
     feature = "azure",
+    feature = "buildless",
     feature = "gcs",
     feature = "gha",
     feature = "memcached",
@@ -555,6 +558,21 @@ pub fn storage_from_config(
                 let storage = AzureBlobCache::build(connection_string, container, key_prefix)
                     .map_err(|err| anyhow!("create azure cache failed: {err:?}"))?;
                 return Ok(Arc::new(storage));
+            }
+            #[cfg(feature = "buildless")]
+            CacheType::Buildless(config::BuildlessConfig {
+                enabled,
+                use_agent,
+                ref transport,
+                ref endpoint,
+                ref apikey,
+            }) => {
+                if *enabled {
+                    debug!("Setting up Buildless cache");
+                    let storage = BuildlessCache::build(use_agent, transport, endpoint, apikey)
+                        .map_err(|err| anyhow!("failed to setup buildless cache: {err:?}"))?;
+                    return Ok(Arc::new(storage));
+                }
             }
             #[cfg(feature = "gcs")]
             CacheType::GCS(config::GCSCacheConfig {
