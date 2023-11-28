@@ -161,7 +161,7 @@ impl BuildlessCache {
         }
         let instance_exists = Path::new(instancepath).exists();
         let agent_config_exists = Path::new(configpath).exists();
-        let do_use_agent  = use_agent.or(Some(true)).unwrap_or_default() &&  // agent is enabled
+        let do_use_agent = use_agent.or(Some(true)).unwrap_or_default() &&  // agent is enabled
             instance_exists &&  // instance is installed on this machine
             agent_config_exists; // agent is running (rendezvous file exists)
 
